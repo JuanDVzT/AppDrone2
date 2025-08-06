@@ -1,34 +1,5 @@
-// /**
-//  * Sample React Native App
-//  * https://github.com/facebook/react-native
-//  *
-//  * @format
-//  */
-
-// import { NewAppScreen } from '@react-native/new-app-screen';
-// import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-
-// function App() {
-//   const isDarkMode = useColorScheme() === 'dark';
-
-//   return (
-//     <View style={styles.container}>
-//       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-//       <NewAppScreen templateFileName="App.tsx" />
-//     </View>
-//   );
-// }
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//   },
-// });
-
-// export default App;
-
 import React, { useEffect, useState } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import dgram from 'react-native-udp';
 
 const PORT = 4210;
@@ -37,14 +8,14 @@ export default function ESP32Scanner() {
   const [espIP, setEspIP] = useState(null);
 
   useEffect(() => {
-    const socket = dgram.createSocket('udp4');
+    const socket = dgram.createSocket({ type: 'udp4' });
 
     socket.bind(PORT);
     socket.once('listening', () => {
       console.log('Escuchando UDP en puerto', PORT);
     });
 
-    socket.on('message', (msg, rinfo) => {
+    socket.on('message', (msg, _rinfo) => {
       const message = msg.toString();
       if (message.startsWith('ESP32|')) {
         const [_, ip, mac] = message.split('|');
@@ -59,11 +30,19 @@ export default function ESP32Scanner() {
   }, []);
 
   return (
-    <View style={{ padding: 20 }}>
-      <Text style={{ fontSize: 18 }}>
+    <View style={styles.container}>
+      <Text style={styles.text}>
         {espIP ? `ESP32 IP: ${espIP}` : 'Buscando ESP32...'}
       </Text>
     </View>
   );
 }
 
+const styles = StyleSheet.create({
+  container: {
+    padding: 20,
+  },
+  text: {
+    fontSize: 18,
+  },
+});
