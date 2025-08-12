@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import MotorController from './MotorController';
 
 type Props = {
   espIP: string;
@@ -8,9 +9,14 @@ type Props = {
 export default function ESP32Connector({ espIP }: Props) {
   const [status, setStatus] = useState('Conectando...');
   const [message, setMessage] = useState('');
+  const [showMotorController, setShowMotorController] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
+    if (!espIP) return;
+
     const ws = new WebSocket(`ws://${espIP}:81/`);
+    wsRef.current = ws;
 
     ws.onopen = () => {
       setStatus(`Conectado a ${espIP}`);
@@ -31,13 +37,28 @@ export default function ESP32Connector({ espIP }: Props) {
 
     return () => {
       ws.close();
+      wsRef.current = null;
     };
   }, [espIP]);
+
+  const toggleMotorController = () => {
+    setShowMotorController(prev => !prev);
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.status}>{status}</Text>
       {message !== '' && <Text style={styles.message}>{message}</Text>}
+
+      {wsRef.current && (
+        <TouchableOpacity style={styles.btn} onPress={toggleMotorController}>
+          <Text style={styles.btnText}>
+            {showMotorController ? 'Ocultar Controlador de Motores' : 'Mostrar Controlador de Motores'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {showMotorController && wsRef.current && <MotorController ws={wsRef.current} />}
     </View>
   );
 }
@@ -58,5 +79,18 @@ const styles = StyleSheet.create({
   message: {
     fontSize: 14,
     color: '#333',
+    marginBottom: 12,
+  },
+  btn: {
+    backgroundColor: '#3b82f6',
+    paddingVertical: 10,
+    borderRadius: 6,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  btnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });
