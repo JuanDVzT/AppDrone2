@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import dgram from 'react-native-udp';
 import ESP32Connector from './ESP32Connector';
+import { TEST_MODE, simulateESP32Detection } from './ESP32Simulator';
 
 const PORT = 4210;
 
@@ -9,25 +10,35 @@ export default function ESP32Scanner() {
   const [espIP, setEspIP] = useState<string | null>(null);
 
   useEffect(() => {
-    const socket = dgram.createSocket({ type: 'udp4' });
-
-    socket.bind(PORT);
-    socket.once('listening', () => {
-      console.log('Escuchando UDP en puerto', PORT);
-    });
-
-    socket.on('message', (msg, _rinfo) => {
-      const message = msg.toString();
-      if (message.startsWith('ESP32|')) {
-        const [_, ip, mac] = message.split('|');
-        console.log(`ESP32 detectado: IP=${ip}, MAC=${mac}`);
+    if (TEST_MODE) {
+      // Usar el simulador
+      const detectionTimeout = simulateESP32Detection((ip) => {
         setEspIP(ip);
-      }
-    });
+      });
+      
+      return () => clearTimeout(detectionTimeout);
+    } else {
+      // Código original para escanear el ESP32 real
+      const socket = dgram.createSocket({ type: 'udp4' });
 
-    return () => {
-      socket.close();
-    };
+      socket.bind(PORT);
+      socket.once('listening', () => {
+        console.log('Escuchando UDP en puerto', PORT);
+      });
+
+      socket.on('message', (msg, _rinfo) => {
+        const message = msg.toString();
+        if (message.startsWith('ESP32|')) {
+          const [_, ip, mac] = message.split('|');
+          console.log(`ESP32 detectado: IP=${ip}, MAC=${mac}`);
+          setEspIP(ip);
+        }
+      });
+
+      return () => {
+        socket.close();
+      };
+    }
   }, []);
 
   return (

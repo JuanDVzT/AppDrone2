@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  GestureResponderEvent,
 } from "react-native";
 import Slider from "@react-native-community/slider";
 
@@ -57,7 +56,6 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
 
     wsLocal.onopen = () => {
       setStatus(`Conectado a ${espIP}`);
-      // opcional: pedir confirmación al servidor
       try { wsLocal.send("App motor controller conectado"); } catch {}
     };
 
@@ -72,7 +70,6 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
     wsRef.current = wsLocal;
 
     return () => {
-      // limpieza: cerrar si era local
       try {
         wsLocal.close();
       } catch {}
@@ -80,34 +77,18 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
     };
   }, [espIP, externalWs]);
 
-  // Al montar, enviar ceros por seguridad (compatibles con .ino: PIN:0)
-  useEffect(() => {
-    if (!wsRef.current) return;
-    // enviar 0 a todos los pines de motor
-    for (const m of MOTORS) {
-      sendRaw(`${m.in1}:0`);
-      sendRaw(`${m.in2}:0`);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wsRef.current]);
-
   // Función para enviar texto por WS si está conectado
   function sendRaw(payload: string) {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== 1) {
-      // no conectado: ignorar (o podrías guardar en cola)
-      // console.warn("WS no disponible, no se envía:", payload);
       return;
     }
     try {
       ws.send(payload);
-    } catch (e) {
-      // swallow
-    }
+    } catch {}
   }
 
   // Envía comandos de control para un motor según valor (-255..255)
-  // Lógica: si val > 0 -> IN1 = val, IN2 = 0; si val < 0 -> IN1 = 0, IN2 = abs(val)
   function sendMotorValue(index: number, val: number) {
     const m = MOTORS[index];
     const v = Math.max(-255, Math.min(255, Math.round(val)));
@@ -118,11 +99,27 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
       sendRaw(`${m.in1}:0`);
       sendRaw(`${m.in2}:${Math.abs(v)}`);
     } else {
-      // v == 0
       sendRaw(`${m.in1}:0`);
       sendRaw(`${m.in2}:0`);
     }
   }
+
+  // Resetear todos los motores a 0
+  function resetAllMotors() {
+    for (const m of MOTORS) {
+      sendRaw(`${m.in1}:0`);
+      sendRaw(`${m.in2}:0`);
+    }
+    setValues(MOTORS.map(() => 0)); // resetea sliders
+  }
+
+  // Al montar y desmontar: enviar ceros
+  useEffect(() => {
+    resetAllMotors();
+    return () => {
+      resetAllMotors();
+    };
+  }, [wsRef.current]);
 
   // Wrapper con debounce por motor (100ms)
   function scheduleSend(index: number, newVal: number) {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import MotorController from './MotorController';
+import { TEST_MODE, simulateWebSocketConnection } from './ESP32Simulator';
 
 type Props = {
   espIP: string;
@@ -10,33 +11,47 @@ export default function ESP32Connector({ espIP }: Props) {
   const [status, setStatus] = useState('Conectando...');
   const [message, setMessage] = useState('');
   const [showMotorController, setShowMotorController] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
+  const wsRef = useRef<WebSocket | any>(null);
 
   useEffect(() => {
     if (!espIP) return;
 
-    const ws = new WebSocket(`ws://${espIP}:81/`);
-    wsRef.current = ws;
+    if (TEST_MODE) {
+      // Usar el simulador
+      setStatus(`Conectado a ${espIP} (Simulado)`);
+      wsRef.current = simulateWebSocketConnection(espIP);
+      
+      // Simular un mensaje recibido después de 1 segundo
+      setTimeout(() => {
+        setMessage('Conexión simulada exitosa');
+      }, 1000);
+    } else {
+      // Código original para conectar con el ESP32 real
+      const ws = new WebSocket(`ws://${espIP}:81/`);
+      wsRef.current = ws;
 
-    ws.onopen = () => {
-      setStatus(`Conectado a ${espIP}`);
-      ws.send('Hola ESP32');
-    };
+      ws.onopen = () => {
+        setStatus(`Conectado a ${espIP}`);
+        ws.send('Hola ESP32');
+      };
 
-    ws.onmessage = (event) => {
-      setMessage(event.data);
-    };
+      ws.onmessage = (event) => {
+        setMessage(event.data);
+      };
 
-    ws.onerror = () => {
-      setStatus('Error de conexión');
-    };
+      ws.onerror = () => {
+        setStatus('Error de conexión');
+      };
 
-    ws.onclose = () => {
-      setStatus('Desconectado');
-    };
+      ws.onclose = () => {
+        setStatus('Desconectado');
+      };
+    }
 
     return () => {
-      ws.close();
+      if (wsRef.current && !TEST_MODE) {
+        wsRef.current.close();
+      }
       wsRef.current = null;
     };
   }, [espIP]);
@@ -62,6 +77,8 @@ export default function ESP32Connector({ espIP }: Props) {
     </View>
   );
 }
+
+// Los estilos permanecen igual
 
 const styles = StyleSheet.create({
   container: {
