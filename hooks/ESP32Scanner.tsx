@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import dgram from 'react-native-udp';
 import ESP32Connector from './ESP32Connector';
-import { TEST_MODE, simulateESP32Detection } from './ESP32Simulator';
+import { getTestMode, simulateESP32Detection } from './ESP32Simulator';
 
 const PORT = 4210;
 
@@ -10,18 +10,15 @@ export default function ESP32Scanner() {
   const [espIP, setEspIP] = useState<string | null>(null);
 
   useEffect(() => {
-    if (TEST_MODE) {
-      // Usar el simulador
+    if (getTestMode()) {
       const detectionTimeout = simulateESP32Detection((ip) => {
         setEspIP(ip);
       });
-      
       return () => clearTimeout(detectionTimeout);
     } else {
-      // Código original para escanear el ESP32 real
       const socket = dgram.createSocket({ type: 'udp4' });
-
       socket.bind(PORT);
+
       socket.once('listening', () => {
         console.log('Escuchando UDP en puerto', PORT);
       });

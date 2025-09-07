@@ -2,26 +2,43 @@
 import React, { useState } from 'react';
 import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import ESP32Scanner from './hooks/ESP32Scanner';
+import { getTestMode, setTestMode } from './hooks/ESP32Simulator';
 
 export default function App() {
   const [appKey, setAppKey] = useState(0);
+  const [testMode, setTestModeState] = useState(getTestMode());
 
   const handleRestart = () => {
-    // cambiar la key desmonta y vuelve a montar toda la app
+    setAppKey(prev => prev + 1);
+  };
+
+  const toggleTestMode = () => {
+    const newValue = !testMode;
+    setTestMode(newValue);
+    setTestModeState(newValue);
+    // Reiniciar la app al cambiar modo
     setAppKey(prev => prev + 1);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header con botón de reinicio */}
       <View style={styles.header}>
         <Text style={styles.title}>Control ESP32</Text>
-        <TouchableOpacity style={styles.restartBtn} onPress={handleRestart}>
-          <Text style={styles.restartText}>Reiniciar App</Text>
-        </TouchableOpacity>
+
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity
+            style={[styles.testBtn, { backgroundColor: testMode ? '#22c55e' : '#9ca3af' }]}
+            onPress={toggleTestMode}
+          >
+            <Text style={styles.restartText}>Test</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.restartBtn} onPress={handleRestart}>
+            <Text style={styles.restartText}>Reiniciar App</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Todo el contenido de la app se reinicia al cambiar la key */}
       <View key={appKey} style={{ flex: 1 }}>
         <ESP32Scanner />
       </View>
@@ -55,5 +72,10 @@ const styles = StyleSheet.create({
   restartText: {
     color: '#fff',
     fontWeight: '700',
+  },
+  testBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
 });

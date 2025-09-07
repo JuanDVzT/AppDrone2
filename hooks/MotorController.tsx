@@ -6,14 +6,13 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from "react-native";
-import Slider from "@react-native-community/slider";
+import { Slider } from "@miblanchard/react-native-slider";
 
 type Props = {
-  espIP?: string;                // si no pasas ws, se usará espIP para abrir WS
-  ws?: WebSocket | null;         // si pasas la ws existente, el componente la reutiliza
+  espIP?: string;
+  ws?: WebSocket | null;
 };
 
-// Descripción de cada "motor" lógico y sus pines IN1/IN2 en el .ino
 const MOTORS = [
   { id: "A1", in1: "A1_IN1", in2: "A1_IN2" },
   { id: "A2", in1: "A2_IN1", in2: "A2_IN2" },
@@ -22,46 +21,34 @@ const MOTORS = [
 ];
 
 export default function MotorController({ espIP, ws: externalWs }: Props) {
-  // estado por motor: valor de -255 .. 255
-  const [values, setValues] = useState<number[]>(
-    () => MOTORS.map(() => 0)
-  );
-
-  // estado de conexión
+  const [values, setValues] = useState<number[]>(() => MOTORS.map(() => 0));
   const [status, setStatus] = useState("Desconectado");
   const wsRef = useRef<WebSocket | null>(externalWs ?? null);
 
-  // debounce timer por motor para agrupar envíos
   const sendTimers = useRef<(NodeJS.Timeout | null)[]>(
     Array(MOTORS.length).fill(null)
   );
 
-  // creación de WS si no se pasó externamente
+  // --- WebSocket ---
   useEffect(() => {
     if (externalWs) {
-      // usamos la ws externa
       wsRef.current = externalWs;
       setStatus("Conectado (WS externa)");
       return;
     }
-
     if (!espIP) {
       setStatus("Esperando IP del ESP32...");
       return;
     }
 
-    // Si no hay ws externa, creamos una propia
     const wsUrl = `ws://${espIP}:81/`;
     const wsLocal = new WebSocket(wsUrl);
 
     wsLocal.onopen = () => {
       setStatus(`Conectado a ${espIP}`);
-      try { wsLocal.send("App motor controller conectado"); } catch {}
-    };
-
-    wsLocal.onmessage = (evt) => {
-      // opcional: mostrar mensajes que envíe el ESP
-      // console.log("WS msg", evt.data);
+      try {
+        wsLocal.send("App motor controller conectado");
+      } catch {}
     };
 
     wsLocal.onerror = () => setStatus("Error WS");
@@ -77,18 +64,15 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
     };
   }, [espIP, externalWs]);
 
-  // Función para enviar texto por WS si está conectado
+  // --- Funciones de envío ---
   function sendRaw(payload: string) {
     const ws = wsRef.current;
-    if (!ws || ws.readyState !== 1) {
-      return;
-    }
+    if (!ws || ws.readyState !== 1) return;
     try {
       ws.send(payload);
     } catch {}
   }
 
-  // Envía comandos de control para un motor según valor (-255..255)
   function sendMotorValue(index: number, val: number) {
     const m = MOTORS[index];
     const v = Math.max(-255, Math.min(255, Math.round(val)));
@@ -104,16 +88,14 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
     }
   }
 
-  // Resetear todos los motores a 0
   function resetAllMotors() {
     for (const m of MOTORS) {
       sendRaw(`${m.in1}:0`);
       sendRaw(`${m.in2}:0`);
     }
-    setValues(MOTORS.map(() => 0)); // resetea sliders
+    setValues(MOTORS.map(() => 0));
   }
 
-  // Al montar y desmontar: enviar ceros
   useEffect(() => {
     resetAllMotors();
     return () => {
@@ -121,7 +103,6 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
     };
   }, [wsRef.current]);
 
-  // Wrapper con debounce por motor (100ms)
   function scheduleSend(index: number, newVal: number) {
     if (sendTimers.current[index]) {
       clearTimeout(sendTimers.current[index] as NodeJS.Timeout);
@@ -132,7 +113,7 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
     }, 100);
   }
 
-  // Handlers UI
+  // --- Handlers ---
   function onIncrement(index: number) {
     setValues((prev) => {
       const next = [...prev];
@@ -141,6 +122,7 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
       return next;
     });
   }
+
   function onDecrement(index: number) {
     setValues((prev) => {
       const next = [...prev];
@@ -149,6 +131,7 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
       return next;
     });
   }
+
   function onSliderChange(index: number, v: number) {
     setValues((prev) => {
       const next = [...prev];
@@ -157,6 +140,7 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
     });
     scheduleSend(index, v);
   }
+
   function onStop(index: number) {
     setValues((prev) => {
       const next = [...prev];
@@ -166,15 +150,13 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
     });
   }
 
-  // Render de cada fila de motor
+  // --- Render fila de motor ---
   function renderMotorRow(index: number) {
     const motor = MOTORS[index];
     const val = values[index];
-
     return (
       <View key={motor.id} style={styles.motorRow}>
         <Text style={styles.motorLabel}>{motor.id}</Text>
-
         <View style={styles.controlsRow}>
           <TouchableOpacity
             style={styles.smallBtn}
@@ -183,16 +165,18 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
             <Text style={styles.btnText}>-</Text>
           </TouchableOpacity>
 
-          <Slider
-            style={styles.slider}
-            minimumValue={-255}
-            maximumValue={255}
-            step={1}
-            value={val}
-            onValueChange={(v) => onSliderChange(index, v)}
-            minimumTrackTintColor="#3b82f6"
-            maximumTrackTintColor="#ddd"
-          />
+          <View style={styles.sliderWrapper}>
+            <Slider
+              value={val}
+              minimumValue={-255}
+              maximumValue={255}
+              step={1}
+              onValueChange={(v) => onSliderChange(index, v[0])}
+              minimumTrackTintColor="#3b82f6"
+              maximumTrackTintColor="#ddd"
+              thumbTintColor="#2563eb"
+            />
+          </View>
 
           <TouchableOpacity
             style={styles.smallBtn}
@@ -208,7 +192,6 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
             <Text style={styles.stopText}>STOP</Text>
           </TouchableOpacity>
         </View>
-
         <Text style={styles.pinInfo}>
           {motor.in1} / {motor.in2}
         </Text>
@@ -216,23 +199,22 @@ export default function MotorController({ espIP, ws: externalWs }: Props) {
     );
   }
 
+  // --- Render principal ---
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Control de motores</Text>
       <Text style={styles.status}>Estado: {status}</Text>
-
       {MOTORS.map((_, i) => renderMotorRow(i))}
-
       <View style={{ height: 20 }} />
-
       <Text style={styles.hint}>
-        Usa los sliders o los botones +/-. Valor positivo → IN1=valor, IN2=0. Valor
-        negativo → IN1=0, IN2=abs(valor).
+        Usa los sliders o los botones +/-. Valor positivo → IN1=valor, IN2=0.
+        Valor negativo → IN1=0, IN2=abs(valor).
       </Text>
     </View>
   );
 }
 
+// --- Estilos ---
 const styles = StyleSheet.create({
   container: {
     padding: 12,
@@ -240,31 +222,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     elevation: 2,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 6,
-  },
-  status: {
-    fontSize: 13,
-    color: "#444",
-    marginBottom: 10,
-  },
+  title: { fontSize: 18, fontWeight: "700", marginBottom: 6 },
+  status: { fontSize: 13, color: "#444", marginBottom: 10 },
   motorRow: {
     marginBottom: 14,
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderColor: "#eee",
   },
-  motorLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 6,
-  },
-  controlsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  motorLabel: { fontSize: 15, fontWeight: "600", marginBottom: 6 },
+  controlsRow: { flexDirection: "row", alignItems: "center" },
   smallBtn: {
     width: 38,
     height: 38,
@@ -274,25 +241,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginHorizontal: 6,
   },
-  btnText: {
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  slider: {
-    flex: 1,
-    height: 40,
-  },
+  btnText: { fontSize: 18, fontWeight: "700" },
+  sliderWrapper: { flex: 1, paddingHorizontal: 4 },
   rowRight: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: 6,
     justifyContent: "space-between",
   },
-  valueText: {
-    fontSize: 14,
-    width: 50,
-    textAlign: "center",
-  },
+  valueText: { fontSize: 14, width: 50, textAlign: "center" },
   stopBtn: {
     marginLeft: 8,
     paddingHorizontal: 10,
@@ -300,17 +257,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#ef4444",
     borderRadius: 6,
   },
-  stopText: {
-    color: "#fff",
-    fontWeight: "700",
-  },
-  pinInfo: {
-    marginTop: 6,
-    fontSize: 11,
-    color: "#666",
-  },
-  hint: {
-    fontSize: 12,
-    color: "#666",
-  },
+  stopText: { color: "#fff", fontWeight: "700" },
+  pinInfo: { marginTop: 6, fontSize: 11, color: "#666" },
+  hint: { fontSize: 12, color: "#666" },
 });

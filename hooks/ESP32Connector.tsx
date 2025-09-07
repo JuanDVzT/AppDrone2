@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import MotorController from './MotorController';
-import { TEST_MODE, simulateWebSocketConnection } from './ESP32Simulator';
+import { getTestMode, simulateWebSocketConnection } from './ESP32Simulator';
 
 type Props = {
   espIP: string;
@@ -16,17 +16,13 @@ export default function ESP32Connector({ espIP }: Props) {
   useEffect(() => {
     if (!espIP) return;
 
-    if (TEST_MODE) {
-      // Usar el simulador
+    if (getTestMode()) {
       setStatus(`Conectado a ${espIP} (Simulado)`);
       wsRef.current = simulateWebSocketConnection(espIP);
-      
-      // Simular un mensaje recibido después de 1 segundo
       setTimeout(() => {
         setMessage('Conexión simulada exitosa');
       }, 1000);
     } else {
-      // Código original para conectar con el ESP32 real
       const ws = new WebSocket(`ws://${espIP}:81/`);
       wsRef.current = ws;
 
@@ -49,7 +45,7 @@ export default function ESP32Connector({ espIP }: Props) {
     }
 
     return () => {
-      if (wsRef.current && !TEST_MODE) {
+      if (wsRef.current && !getTestMode()) {
         wsRef.current.close();
       }
       wsRef.current = null;
@@ -77,8 +73,6 @@ export default function ESP32Connector({ espIP }: Props) {
     </View>
   );
 }
-
-// Los estilos permanecen igual
 
 const styles = StyleSheet.create({
   container: {
