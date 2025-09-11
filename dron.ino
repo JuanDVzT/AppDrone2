@@ -3,18 +3,18 @@
 #include <WebSocketsServer.h>
 
 // Pines
-#define A1_IN1 13
-#define A1_IN2 12
-#define A2_IN1 14
-#define A2_IN2 27
-#define B1_IN1 26
-#define B1_IN2 25
+#define A1_IN1 12
+#define A1_IN2 13
+#define A2_IN1 27
+#define A2_IN2 14
+#define B1_IN1 25
+#define B1_IN2 26
 #define B2_IN1 33
 #define B2_IN2 32
 
 // WiFi y WebSocket
-const char* ssid = "ALEXIS";
-const char* password = "58036136";
+const char* ssid = "Prueba";
+const char* password = "12345678";
 
 WiFiUDP udp;
 WebSocketsServer webSocket = WebSocketsServer(81);

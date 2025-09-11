@@ -1,6 +1,6 @@
 // ESP32Simulator.ts
 // Variable que podemos modificar
-export let TEST_MODE = true;
+export let TEST_MODE = false;
 
 export const setTestMode = (value: boolean) => {
   TEST_MODE = value;
