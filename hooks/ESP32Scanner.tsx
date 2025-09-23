@@ -51,6 +51,7 @@ export default function ESP32Scanner() {
 const styles = StyleSheet.create({
   container: {
     padding: 20,
+    minHeight: 500,
   },
   text: {
     fontSize: 18,

@@ -1,6 +1,13 @@
 // App.tsx
 import React, { useState } from 'react';
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { 
+  SafeAreaView, 
+  StyleSheet, 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  ScrollView
+} from 'react-native';
 import ESP32Scanner from './hooks/ESP32Scanner';
 import { getTestMode, setTestMode } from './hooks/ESP32Simulator';
 
@@ -39,9 +46,15 @@ export default function App() {
         </View>
       </View>
 
-      <View key={appKey} style={{ flex: 1 }}>
-        <ESP32Scanner />
-      </View>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View key={appKey} style={{ flex: 1 }}>
+          <ESP32Scanner />
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -77,5 +90,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: 12,
   },
 });

@@ -21,8 +21,11 @@ WebSocketsServer webSocket = WebSocketsServer(81);
 
 const int udpPort = 4210;
 unsigned long lastBroadcast = 0;
+unsigned long lastWifiCheck = 0;
 const unsigned long broadcastIntervalDisconnected = 1000;
+const unsigned long wifiCheckInterval = 5000; // Verificar WiFi cada 5 segundos
 bool wsConnected = false;
+bool wifiConnected = false;
 
 // Mapeo de nombres a pines
 struct PinMap {
@@ -99,44 +102,102 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t leng
   }
 }
 
+bool connectToWiFi() {
+  Serial.print("Conectando a WiFi");
+  WiFi.begin(ssid, password);
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) { // Máximo 10 segundos
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nConectado a WiFi");
+    Serial.println("IP local: " + WiFi.localIP().toString());
+    wifiConnected = true;
+    return true;
+  } else {
+    Serial.println("\nError: No se pudo conectar al WiFi");
+    wifiConnected = false;
+    return false;
+  }
+}
+
+void checkWiFiConnection() {
+  if (WiFi.status() != WL_CONNECTED) {
+    if (wifiConnected) {
+      Serial.println("Conexión WiFi perdida");
+      wsConnected = false;
+      wifiConnected = false;
+      // Apagar motores por seguridad
+      apagarMotoresProgresivo();
+    }
+    
+    // Intentar reconexión
+    unsigned long now = millis();
+    if (now - lastWifiCheck > wifiCheckInterval) {
+      lastWifiCheck = now;
+      Serial.println("Intentando reconectar al WiFi...");
+      connectToWiFi();
+    }
+  } else {
+    if (!wifiConnected) {
+      Serial.println("WiFi reconectado exitosamente");
+      wifiConnected = true;
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
-  WiFi.begin(ssid, password);
-  Serial.print("Conectando a WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nConectado a WiFi");
-  Serial.println("IP local: " + WiFi.localIP().toString());
-
-  webSocket.begin();
-  webSocket.onEvent(onWebSocketEvent);
-  udp.begin(udpPort);
-
+  // Configurar pines primero
   for (auto &pm : pinMap) {
     pinMode(pm.pin, OUTPUT);
     analogWrite(pm.pin, 0);
   }
+
+  // Conectar a WiFi
+  connectToWiFi();
+
+  // Inicializar WebSocket y UDP solo si WiFi está conectado
+  if (wifiConnected) {
+    webSocket.begin();
+    webSocket.onEvent(onWebSocketEvent);
+    udp.begin(udpPort);
+    Serial.println("WebSocket y UDP inicializados");
+  } else {
+    Serial.println("WebSocket y UDP NO inicializados - Sin conexión WiFi");
+  }
 }
 
 void loop() {
-  webSocket.loop();
+  // Verificar y mantener conexión WiFi
+  checkWiFiConnection();
 
-  unsigned long now = millis();
+  // Solo procesar WebSocket y broadcasts si WiFi está conectado
+  if (wifiConnected) {
+    webSocket.loop();
 
-  if (!wsConnected && now - lastBroadcast > broadcastIntervalDisconnected) {
-    lastBroadcast = now;
+    unsigned long now = millis();
 
-    IPAddress broadcastIP = WiFi.localIP();
-    broadcastIP[3] = 255;
+    if (!wsConnected && now - lastBroadcast > broadcastIntervalDisconnected) {
+      lastBroadcast = now;
 
-    String message = "ESP32|" + WiFi.localIP().toString() + "|" + WiFi.macAddress();
-    udp.beginPacket(broadcastIP, udpPort);
-    udp.write((const uint8_t*)message.c_str(), message.length());
-    udp.endPacket();
+      IPAddress broadcastIP = WiFi.localIP();
+      broadcastIP[3] = 255;
 
-    Serial.println("Broadcast enviado: " + message);
+      String message = "ESP32|" + WiFi.localIP().toString() + "|" + WiFi.macAddress();
+      udp.beginPacket(broadcastIP, udpPort);
+      udp.write((const uint8_t*)message.c_str(), message.length());
+      udp.endPacket();
+
+      Serial.println("Broadcast enviado: " + message);
+    }
+  } else {
+    // Si no hay WiFi, pequeño delay para no saturar el loop
+    delay(100);
   }
 }

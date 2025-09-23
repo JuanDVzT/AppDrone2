@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import MotorController from './MotorController';
 import { getTestMode, simulateWebSocketConnection } from './ESP32Simulator';
@@ -11,65 +11,139 @@ export default function ESP32Connector({ espIP }: Props) {
   const [status, setStatus] = useState('Conectando...');
   const [message, setMessage] = useState('');
   const [showMotorController, setShowMotorController] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | any>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 5;
 
-  useEffect(() => {
+  const connectWebSocket = useCallback(() => {
     if (!espIP) return;
+
+    // Limpiar intento de reconexión anterior
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
 
     if (getTestMode()) {
       setStatus(`Conectado a ${espIP} (Simulado)`);
+      setIsConnected(true);
       wsRef.current = simulateWebSocketConnection(espIP);
       setTimeout(() => {
         setMessage('Conexión simulada exitosa');
       }, 1000);
-    } else {
+      return;
+    }
+
+    try {
       const ws = new WebSocket(`ws://${espIP}:81/`);
       wsRef.current = ws;
 
       ws.onopen = () => {
+        console.log('WebSocket conectado exitosamente');
         setStatus(`Conectado a ${espIP}`);
-        ws.send('Hola ESP32');
+        setIsConnected(true);
+        reconnectAttemptsRef.current = 0;
+        ws.send('Hola ESP32 - Reconectado');
       };
 
       ws.onmessage = (event) => {
         setMessage(event.data);
       };
 
-      ws.onerror = () => {
-        setStatus('Error de conexión');
+      ws.onerror = (error) => {
+        console.log('Error WebSocket:', error);
+        setIsConnected(false);
       };
 
-      ws.onclose = () => {
-        setStatus('Desconectado');
+      ws.onclose = (event) => {
+        console.log(`WebSocket cerrado: ${event.code} - ${event.reason}`);
+        setIsConnected(false);
+        
+        // No intentar reconexión si fue un cierre intencional
+        if (event.code === 1000) return;
+        
+        // Reconexión automática con backoff
+        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+          reconnectAttemptsRef.current++;
+          const delay = Math.min(1000 * reconnectAttemptsRef.current, 5000);
+          setStatus(`Reconectando en ${delay/1000} segundos... (${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connectWebSocket();
+          }, delay);
+        } else {
+          setStatus('Error: Máximo de reconexiones alcanzado');
+        }
       };
+    } catch (error) {
+      console.error('Error creando WebSocket:', error);
+      setIsConnected(false);
     }
+  }, [espIP]);
+
+  useEffect(() => {
+    connectWebSocket();
 
     return () => {
-      if (wsRef.current && !getTestMode()) {
-        wsRef.current.close();
+      // Limpieza
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
       }
-      wsRef.current = null;
+      if (wsRef.current && !getTestMode()) {
+        wsRef.current.close(1000, "Component unmount");
+      }
     };
-  }, [espIP]);
+  }, [connectWebSocket]);
+
+  // Reconectar manualmente si la IP cambia
+  useEffect(() => {
+    if (espIP) {
+      reconnectAttemptsRef.current = 0;
+      connectWebSocket();
+    }
+  }, [espIP, connectWebSocket]);
 
   const toggleMotorController = () => {
     setShowMotorController(prev => !prev);
   };
 
+  const forceReconnect = () => {
+    reconnectAttemptsRef.current = 0;
+    connectWebSocket();
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.status}>{status}</Text>
+      <View style={styles.headerRow}>
+        <Text style={[styles.status, { color: isConnected ? '#22c55e' : '#ef4444' }]}>
+          {status}
+        </Text>
+        {!isConnected && (
+          <TouchableOpacity style={styles.reconnectBtn} onPress={forceReconnect}>
+            <Text style={styles.reconnectText}>Reconectar</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      
       {message !== '' && <Text style={styles.message}>{message}</Text>}
 
-      {wsRef.current && (
+      {isConnected && (
         <TouchableOpacity style={styles.btn} onPress={toggleMotorController}>
           <Text style={styles.btnText}>
-            {showMotorController ? 'Ocultar Controlador de Motores' : 'Mostrar Controlador de Motores'}
+            {showMotorController ? 'Ocultar Controlador' : 'Mostrar Controlador'}
           </Text>
         </TouchableOpacity>
       )}
 
-      {showMotorController && wsRef.current && <MotorController ws={wsRef.current} />}
+      {showMotorController && (
+        <MotorController 
+          ws={wsRef.current} 
+          isConnected={isConnected}
+          onReconnect={forceReconnect}
+        />
+      )}
     </View>
   );
 }
@@ -82,10 +156,27 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     elevation: 2,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   status: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 8,
+    flex: 1,
+  },
+  reconnectBtn: {
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  reconnectText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   message: {
     fontSize: 14,
