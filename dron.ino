@@ -13,8 +13,8 @@
 #define B2_IN2 32
 
 // WiFi y WebSocket
-const char* ssid = "Prueba";
-const char* password = "12345678";
+const char* ssid = "Alexis";
+const char* password = "58036136";
 
 WiFiUDP udp;
 WebSocketsServer webSocket = WebSocketsServer(81);

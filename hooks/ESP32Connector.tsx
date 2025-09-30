@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import MotorController from './MotorController';
+import UnifiedMotorController from './UnifiedMotorController';
 import { getTestMode, simulateWebSocketConnection } from './ESP32Simulator';
 
 type Props = {
@@ -11,6 +12,7 @@ export default function ESP32Connector({ espIP }: Props) {
   const [status, setStatus] = useState('Conectando...');
   const [message, setMessage] = useState('');
   const [showMotorController, setShowMotorController] = useState(false);
+  const [showUnifiedMotorController, setShowUnifiedMotorController] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | any>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -107,6 +109,18 @@ export default function ESP32Connector({ espIP }: Props) {
 
   const toggleMotorController = () => {
     setShowMotorController(prev => !prev);
+    // Cierra el controlador unificado si está abierto
+    if (showUnifiedMotorController) {
+      setShowUnifiedMotorController(false);
+    }
+  };
+
+  const toggleUnifiedMotorController = () => {
+    setShowUnifiedMotorController(prev => !prev);
+    // Cierra el controlador individual si está abierto
+    if (showMotorController) {
+      setShowMotorController(false);
+    }
   };
 
   const forceReconnect = () => {
@@ -115,40 +129,75 @@ export default function ESP32Connector({ espIP }: Props) {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={[styles.status, { color: isConnected ? '#22c55e' : '#ef4444' }]}>
-          {status}
-        </Text>
-        {!isConnected && (
-          <TouchableOpacity style={styles.reconnectBtn} onPress={forceReconnect}>
-            <Text style={styles.reconnectText}>Reconectar</Text>
-          </TouchableOpacity>
+    <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
+      <View style={styles.container}>
+        <View style={styles.headerRow}>
+          <Text style={[styles.status, { color: isConnected ? '#22c55e' : '#ef4444' }]}>
+            {status}
+          </Text>
+          {!isConnected && (
+            <TouchableOpacity style={styles.reconnectBtn} onPress={forceReconnect}>
+              <Text style={styles.reconnectText}>Reconectar</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        
+        {message !== '' && <Text style={styles.message}>{message}</Text>}
+
+        {isConnected && (
+          <View style={styles.buttonsContainer}>
+            <TouchableOpacity 
+              style={[
+                styles.btn, 
+                showMotorController && styles.btnActive
+              ]} 
+              onPress={toggleMotorController}
+            >
+              <Text style={styles.btnText}>
+                {showMotorController ? 'Ocultar Control Individual' : 'Control Individual de Motores'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[
+                styles.btn, 
+                styles.unifiedBtn,
+                showUnifiedMotorController && styles.btnActive
+              ]} 
+              onPress={toggleUnifiedMotorController}
+            >
+              <Text style={styles.btnText}>
+                {showUnifiedMotorController ? 'Ocultar Control Unificado' : 'Control Unificado de Motores'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {showMotorController && (
+          <MotorController 
+            ws={wsRef.current} 
+            isConnected={isConnected}
+            onReconnect={forceReconnect}
+          />
+        )}
+
+        {showUnifiedMotorController && (
+          <UnifiedMotorController 
+            ws={wsRef.current}
+          />
         )}
       </View>
-      
-      {message !== '' && <Text style={styles.message}>{message}</Text>}
-
-      {isConnected && (
-        <TouchableOpacity style={styles.btn} onPress={toggleMotorController}>
-          <Text style={styles.btnText}>
-            {showMotorController ? 'Ocultar Controlador' : 'Mostrar Controlador'}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {showMotorController && (
-        <MotorController 
-          ws={wsRef.current} 
-          isConnected={isConnected}
-          onReconnect={forceReconnect}
-        />
-      )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 10,
+  },
   container: {
     marginTop: 20,
     padding: 10,
@@ -183,12 +232,20 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 12,
   },
+  buttonsContainer: {
+    gap: 10,
+  },
   btn: {
     backgroundColor: '#3b82f6',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 6,
     alignItems: 'center',
-    marginBottom: 10,
+  },
+  unifiedBtn: {
+    backgroundColor: '#10b981',
+  },
+  btnActive: {
+    backgroundColor: '#1d4ed8',
   },
   btnText: {
     color: '#fff',
