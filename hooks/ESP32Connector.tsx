@@ -5,7 +5,6 @@ import UnifiedMotorController from './UnifiedMotorController';
 import DroneController from './DroneController';
 import CalibrationManager from './CalibrationManager';
 import { getTestMode, setTestMode, simulateWebSocketConnection } from './ESP32Simulator';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = {
   espIP: string;
@@ -22,6 +21,28 @@ interface CalibrationValues {
   alpha: number;
   takeoffDuration: number;
 }
+
+// Usar AsyncStorage nativo de React Native
+const AsyncStorage = {
+  getItem: async (key: string): Promise<string | null> => {
+    try {
+      // @ts-ignore - React Native proporciona AsyncStorage globalmente
+      return await global.AsyncStorage?.getItem(key) || null;
+    } catch (error) {
+      console.log('Error getting item:', error);
+      return null;
+    }
+  },
+  setItem: async (key: string, value: string): Promise<void> => {
+    try {
+      // @ts-ignore - React Native proporciona AsyncStorage globalmente
+      await global.AsyncStorage?.setItem(key, value);
+    } catch (error) {
+      console.log('Error setting item:', error);
+      throw error;
+    }
+  }
+};
 
 export default function ESP32Connector({ espIP }: Props) {
   const [status, setStatus] = useState('Conectando...');
