@@ -32,10 +32,10 @@ export default function MotorController({ espIP, ws: externalWs, isConnected = f
     Array(MOTORS.length).fill(null)
   );
 
-  // Estado de conexión combinado (externo + interno)
+ 
   const combinedConnected = externalWs ? isConnected : internalConnected;
 
-  // --- WebSocket con reconexión automática ---
+
   useEffect(() => {
     if (externalWs) {
       wsRef.current = externalWs;
@@ -83,13 +83,13 @@ export default function MotorController({ espIP, ws: externalWs, isConnected = f
           console.log(`WebSocket cerrado: ${event.code} - ${event.reason}`);
           setInternalConnected(false);
           
-          // No intentar reconexión si fue un cierre normal
+          
           if (event.code === 1000) {
             setStatus("Desconectado");
             return;
           }
           
-          // Reconexión automática con backoff
+          
           if (reconnectAttempts < maxReconnectAttempts) {
             reconnectAttempts++;
             const delay = Math.min(1000 * reconnectAttempts, 5000);
@@ -126,10 +126,9 @@ export default function MotorController({ espIP, ws: externalWs, isConnected = f
     };
   }, [espIP, externalWs]);
 
-  // --- Reenviar estado al reconectar ---
   useEffect(() => {
     if (combinedConnected && wsRef.current?.readyState === WebSocket.OPEN) {
-      // Reconexión exitosa - reenviar estado actual a los motores
+     
       const timeout = setTimeout(() => {
         console.log('Reenviando estado de motores tras reconexión...');
         values.forEach((val, index) => {
@@ -143,13 +142,11 @@ export default function MotorController({ espIP, ws: externalWs, isConnected = f
     }
   }, [combinedConnected, values]);
 
-  // --- Funciones de envío mejoradas ---
   function sendRaw(payload: string): boolean {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       console.log('WebSocket no conectado, no se puede enviar:', payload);
       
-      // Intentar reconexión si hay callback
       if (onReconnect) {
         console.log('Solicitando reconexión...');
         onReconnect();
@@ -191,7 +188,6 @@ export default function MotorController({ espIP, ws: externalWs, isConnected = f
     setValues(MOTORS.map(() => 0));
   }
 
-  // Apagar motores al desmontar el componente
   useEffect(() => {
     return () => {
       resetAllMotors();
@@ -208,7 +204,6 @@ export default function MotorController({ espIP, ws: externalWs, isConnected = f
     }, 100);
   }
 
-  // --- Handlers ---
   function onIncrement(index: number) {
     setValues((prev) => {
       const next = [...prev];
@@ -249,15 +244,12 @@ export default function MotorController({ espIP, ws: externalWs, isConnected = f
     if (onReconnect) {
       onReconnect();
     } else {
-      // Reiniciar conexión interna si no hay callback externo
       setValues(MOTORS.map(() => 0));
       setTimeout(() => {
-        // El efecto de WebSocket se reactivará automáticamente
       }, 100);
     }
   }
 
-  // --- Render fila de motor ---
   function renderMotorRow(index: number) {
     const motor = MOTORS[index];
     const val = values[index];
@@ -316,7 +308,7 @@ export default function MotorController({ espIP, ws: externalWs, isConnected = f
     );
   }
 
-  // --- Render principal ---
+  // --- Render 
   return (
     <View style={styles.container}>
       <View style={styles.header}>

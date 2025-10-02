@@ -1,4 +1,4 @@
-// UnifiedMotorController.tsx
+
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
@@ -27,7 +27,6 @@ export default function UnifiedMotorController({ espIP, ws: externalWs }: Props)
   const wsRef = useRef<WebSocket | null>(externalWs ?? null);
   const sendTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // --- WebSocket ---
   useEffect(() => {
     if (externalWs) {
       wsRef.current = externalWs;
@@ -72,9 +71,9 @@ export default function UnifiedMotorController({ espIP, ws: externalWs }: Props)
   }
 
   function sendUnifiedValue(value: number) {
-    const val = Math.max(0, Math.min(255, Math.round(value))); // Solo valores positivos 0-255
+    const val = Math.max(0, Math.min(255, Math.round(value))); 
     
-    // A1 usa valores positivos (IN1=valor, IN2=0)
+
     const m1 = MOTORS[0]; // A1
     if (val > 0) {
       sendRaw(`${m1.in1}:${val}`);
@@ -83,8 +82,6 @@ export default function UnifiedMotorController({ espIP, ws: externalWs }: Props)
       sendRaw(`${m1.in1}:0`);
       sendRaw(`${m1.in2}:0`);
     }
-
-    // A2, B1, B2 usan valores negativos (IN1=0, IN2=valor)
     const negativeMotors = MOTORS.slice(1); // A2, B1, B2
     
     negativeMotors.forEach(m => {

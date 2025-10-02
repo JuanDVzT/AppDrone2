@@ -1,4 +1,3 @@
-// ESP32Simulator.ts
 export let TEST_MODE = false;
 
 export const setTestMode = (value: boolean) => {
@@ -51,6 +50,6 @@ export const simulateWebSocketConnection = (ip: string) => {
     close: () => {
       console.log('🔌 Conexión WebSocket simulada cerrada');
     },
-    readyState: 1 // Simular estado conectado
+    readyState: 1 //
   };
 };

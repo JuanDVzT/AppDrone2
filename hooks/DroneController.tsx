@@ -168,63 +168,63 @@ export default function DroneController({ ws, isConnected }: Props) {
 
   // ===== HANDLERS DE CONTROLES =====
 
-  const updateMovement = (updates: Partial<MovementState>) => {
-    setMovement(prev => ({ ...prev, ...updates }));
-  };
+const updateMovement = (updates: Partial<MovementState>) => {
+  setMovement(prev => ({ ...prev, ...updates }));
+};
 
-  const handleThrottleChange = (change: number) => {
-    setMovement(prev => {
-      const newThrottle = Math.max(
-        CONTROL_CONSTANTS.THROTTLE.MIN,
-        Math.min(CONTROL_CONSTANTS.THROTTLE.MAX, prev.throttle + change)
-      );
-      
-      return { ...prev, throttle: newThrottle };
-    });
-  };
-
-  const handleDirectionPress = (direction: 'forward' | 'backward' | 'left' | 'right') => {
-    const updates: Partial<MovementState> = {};
+const handleThrottleChange = (change: number) => {
+  setMovement(prev => {
+    const newThrottle = Math.max(
+      CONTROL_CONSTANTS.THROTTLE.MIN,
+      Math.min(CONTROL_CONSTANTS.THROTTLE.MAX, prev.throttle + change)
+    );
     
-    switch (direction) {
-      case 'forward':
-        updates.pitch = CONTROL_CONSTANTS.MOVEMENT.PITCH_FORCE;
-        break;
-      case 'backward':
-        updates.pitch = -CONTROL_CONSTANTS.MOVEMENT.PITCH_FORCE;
-        break;
-      case 'left':
-        updates.roll = -CONTROL_CONSTANTS.MOVEMENT.ROLL_FORCE;
-        break;
-      case 'right':
-        updates.roll = CONTROL_CONSTANTS.MOVEMENT.ROLL_FORCE;
-        break;
-    }
-    
-    updateMovement(updates);
-    if (!sendIntervalRef.current) {
-      startSendingCommands();
-    }
-  };
+    return { ...prev, throttle: newThrottle };
+  });
+};
 
-  const handleDirectionRelease = (axis: 'pitch' | 'roll') => {
-    updateMovement({ [axis]: CONTROL_CONSTANTS.MOVEMENT.NEUTRAL });
-  };
+const handleDirectionPress = (direction: 'forward' | 'backward' | 'left' | 'right') => {
+  const updates: Partial<MovementState> = {};
+  
+  switch (direction) {
+    case 'forward':
+      updates.pitch = CONTROL_CONSTANTS.MOVEMENT.PITCH_FORCE;
+      break;
+    case 'backward':
+      updates.pitch = -CONTROL_CONSTANTS.MOVEMENT.PITCH_FORCE;
+      break;
+    case 'left':
+      updates.roll = -CONTROL_CONSTANTS.MOVEMENT.ROLL_FORCE;
+      break;
+    case 'right':
+      updates.roll = CONTROL_CONSTANTS.MOVEMENT.ROLL_FORCE;
+      break;
+  }
+  
+  updateMovement(updates);
+  if (!sendIntervalRef.current) {
+    startSendingCommands();
+  }
+};
 
-  const handleYawPress = (direction: 'left' | 'right') => {
-    const yaw = direction === 'left' 
-      ? -CONTROL_CONSTANTS.MOVEMENT.YAW_FORCE 
-      : CONTROL_CONSTANTS.MOVEMENT.YAW_FORCE;
-    
-    updateMovement({ yaw });
-    if (!sendIntervalRef.current) {
-      startSendingCommands();
-    }
-  };
+const handleDirectionRelease = (axis: 'pitch' | 'roll') => {
+  updateMovement({ [axis]: CONTROL_CONSTANTS.MOVEMENT.NEUTRAL });
+};
 
-  const handleYawRelease = () => {
-    updateMovement({ yaw: CONTROL_CONSTANTS.MOVEMENT.NEUTRAL });
-  };
+const handleYawPress = (direction: 'left' | 'right') => {
+  const yaw = direction === 'left' 
+    ? -CONTROL_CONSTANTS.MOVEMENT.YAW_FORCE 
+    : CONTROL_CONSTANTS.MOVEMENT.YAW_FORCE;
+  
+  updateMovement({ yaw });
+  if (!sendIntervalRef.current) {
+    startSendingCommands();
+  }
+};
+
+const handleYawRelease = () => {
+  updateMovement({ yaw: CONTROL_CONSTANTS.MOVEMENT.NEUTRAL });
+};
 
   const handleTakeOff = () => {
     Alert.alert(
@@ -290,139 +290,83 @@ export default function DroneController({ ws, isConnected }: Props) {
 
   // ===== RENDER =====
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Control de Dron</Text>
+return (
+  <View style={styles.container}>
+    {/* ... resto del código igual ... */}
+
+    {/* DIRECTION CONTROL */}
+    <View style={styles.directionSection}>
+      <Text style={styles.sectionTitle}>DIRECCIÓN</Text>
       
-      <View style={styles.connectionStatus}>
-        <View 
-          style={[
-            styles.statusIndicator, 
-            { backgroundColor: isConnected ? '#22c55e' : '#ef4444' }
-          ]} 
-        />
-        <Text style={styles.statusText}>
-          {isConnected ? 'CONECTADO' : 'DESCONECTADO'}
-        </Text>
-      </View>
-
-      {/* THROTTLE CONTROL */}
-      <View style={styles.throttleSection}>
-        <View style={styles.throttleHeader}>
-          <Text style={styles.sectionTitle}>ALTITUD: {movement.throttle}</Text>
+      <View style={styles.dpadContainer}>
+        <View style={styles.dpadRow}>
           <TouchableOpacity
-            style={styles.resetThrottleBtn}
-            onPress={handleResetThrottle}
+            style={[styles.dpadBtn, styles.forwardBtn]}
+            onPressIn={() => handleYawPress('right')} 
+            onPressOut={handleYawRelease}  
             disabled={!isConnected}
           >
-            <Text style={styles.resetThrottleText}>RESET</Text>
+            <Text style={styles.dpadText}>↑</Text>
           </TouchableOpacity>
         </View>
         
-        <View style={styles.throttleDisplay}>
-          <Text style={styles.throttleValue}>{movement.throttle}</Text>
-          <View style={styles.throttleBar}>
-            <View 
-              style={[
-                styles.throttleFill,
-                { height: `${(movement.throttle / 255) * 100}%` }
-              ]} 
-            />
-          </View>
-        </View>
-
-        <View style={styles.altitudeButtons}>
+        <View style={styles.dpadRow}>
           <TouchableOpacity
-            style={[styles.altitudeBtn, styles.upBtn]}
-            onPressIn={() => handleThrottleChange(CONTROL_CONSTANTS.THROTTLE.STEP)}
+            style={[styles.dpadBtn, styles.leftBtn]}
+            onPressIn={() => handleDirectionPress('backward')}
+            onPressOut={() => handleDirectionRelease('pitch')}
             disabled={!isConnected}
           >
-            <Text style={styles.altitudeText}>▲ SUBIR</Text>
+            <Text style={styles.dpadText}>←</Text>
           </TouchableOpacity>
           
+          <View style={styles.dpadCenter} />
+          
           <TouchableOpacity
-            style={[styles.altitudeBtn, styles.downBtn]}
-            onPressIn={() => handleThrottleChange(-CONTROL_CONSTANTS.THROTTLE.STEP)}
+            style={[styles.dpadBtn, styles.rightBtn]}
+            onPressIn={() => handleDirectionPress('forward')}
+            onPressOut={() => handleDirectionRelease('pitch')}
             disabled={!isConnected}
           >
-            <Text style={styles.altitudeText}>▼ BAJAR</Text>
+            <Text style={styles.dpadText}>→</Text>
           </TouchableOpacity>
         </View>
-      </View>
-
-      {/* DIRECTION CONTROL */}
-      <View style={styles.directionSection}>
-        <Text style={styles.sectionTitle}>DIRECCIÓN</Text>
         
-        <View style={styles.dpadContainer}>
-          <View style={styles.dpadRow}>
-            <TouchableOpacity
-              style={[styles.dpadBtn, styles.forwardBtn]}
-              onPressIn={() => handleDirectionPress('forward')}
-              onPressOut={() => handleDirectionRelease('pitch')}
-              disabled={!isConnected}
-            >
-              <Text style={styles.dpadText}>↑</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.dpadRow}>
-            <TouchableOpacity
-              style={[styles.dpadBtn, styles.leftBtn]}
-              onPressIn={() => handleDirectionPress('left')}
-              onPressOut={() => handleDirectionRelease('roll')}
-              disabled={!isConnected}
-            >
-              <Text style={styles.dpadText}>←</Text>
-            </TouchableOpacity>
-            
-            <View style={styles.dpadCenter} />
-            
-            <TouchableOpacity
-              style={[styles.dpadBtn, styles.rightBtn]}
-              onPressIn={() => handleDirectionPress('right')}
-              onPressOut={() => handleDirectionRelease('roll')}
-              disabled={!isConnected}
-            >
-              <Text style={styles.dpadText}>→</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.dpadRow}>
-            <TouchableOpacity
-              style={[styles.dpadBtn, styles.backwardBtn]}
-              onPressIn={() => handleDirectionPress('backward')}
-              onPressOut={() => handleDirectionRelease('pitch')}
-              disabled={!isConnected}
-            >
-              <Text style={styles.dpadText}>↓</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.yawContainer}>
-          <Text style={styles.yawLabel}>ROTACIÓN</Text>
-          <View style={styles.yawButtons}>
-            <TouchableOpacity
-              style={[styles.yawBtn, styles.yawLeftBtn]}
-              onPressIn={() => handleYawPress('left')}
-              onPressOut={handleYawRelease}
-              disabled={!isConnected}
-            >
-              <Text style={styles.yawText}>↶ IZQ</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.yawBtn, styles.yawRightBtn]}
-              onPressIn={() => handleYawPress('right')}
-              onPressOut={handleYawRelease}
-              disabled={!isConnected}
-            >
-              <Text style={styles.yawText}>DER ↷</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.dpadRow}>
+          <TouchableOpacity
+            style={[styles.dpadBtn, styles.backwardBtn]}
+            onPressIn={() => handleYawPress('left')}
+            onPressOut={handleYawRelease}  
+            disabled={!isConnected}
+          >
+            <Text style={styles.dpadText}>↓</Text>
+          </TouchableOpacity>
         </View>
       </View>
+
+      <View style={styles.yawContainer}>
+        <Text style={styles.yawLabel}>ROTACIÓN</Text>
+        <View style={styles.yawButtons}>
+          <TouchableOpacity
+            style={[styles.yawBtn, styles.yawLeftBtn]}
+            onPressIn={() => handleDirectionPress('left')} 
+            onPressOut={() => handleDirectionRelease('roll')}  
+            disabled={!isConnected}
+          >
+            <Text style={styles.yawText}>↶ IZQ</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.yawBtn, styles.yawRightBtn]}
+            onPressIn={() => handleDirectionPress('right')} 
+            onPressOut={() => handleDirectionRelease('roll')}
+            disabled={!isConnected}
+          >
+            <Text style={styles.yawText}>DER ↷</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
 
       {/* FLIGHT COMMANDS */}
       <View style={styles.flightCommands}>
@@ -462,7 +406,6 @@ export default function DroneController({ ws, isConnected }: Props) {
   );
 }
 
-// Estilos (los mismos que antes)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
