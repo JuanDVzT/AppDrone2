@@ -1,11 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 
 type Props = {
   ws: WebSocket | null;
@@ -14,10 +8,18 @@ type Props = {
 
 // Configuración fija de motores según tu hardware
 const MOTOR_CONFIG = {
-  A1: { in1: "A1_IN1", in2: "A1_IN2", direction: 1 },    // Positivo
-  A2: { in1: "A2_IN1", in2: "A2_IN2", direction: -1 },   // Negativo  
-  B1: { in1: "B1_IN1", in2: "B1_IN2", direction: -1 },   // Negativo
-  B2: { in1: "B2_IN1", in2: "B2_IN2", direction: -1 },   // Negativo
+  A1: { in1: 'A1_IN1', in2: 'A1_IN2', direction: 1 }, // Positivo
+  A2: { in1: 'A2_IN1', in2: 'A2_IN2', direction: -1 }, // Negativo
+  B1: { in1: 'B1_IN1', in2: 'B1_IN2', direction: -1 }, // Negativo
+  B2: { in1: 'B2_IN1', in2: 'B2_IN2', direction: -1 }, // Negativo
+};
+
+// CONSTANTES DE AJUSTE PARA BAJAR POTENCIA A MOTORES ESPECÍFICOS
+const MOTOR_ADJUSTMENTS = {
+  A1: 32, // Ajuste para motor A1 (0 = sin ajuste)   3
+  A2: 0, // Ajuste para motor A2                     1
+  B1: 0, // Ajuste para motor B1                    2
+  B2: 13, // Ajuste para motor B2                    4
 };
 
 // Constantes de control
@@ -26,14 +28,14 @@ const CONTROL_CONSTANTS = {
     MIN: 0,
     MAX: 255,
     STEP: 10,
-    DEFAULT: 0
+    DEFAULT: 0,
   },
   MOVEMENT: {
     PITCH_FORCE: 80,
-    ROLL_FORCE: 80, 
+    ROLL_FORCE: 80,
     YAW_FORCE: 100,
-    NEUTRAL: 0
-  }
+    NEUTRAL: 0,
+  },
 };
 
 type MotorSpeeds = {
@@ -56,7 +58,7 @@ export default function DroneController({ ws, isConnected }: Props) {
     throttle: CONTROL_CONSTANTS.THROTTLE.DEFAULT,
     pitch: CONTROL_CONSTANTS.MOVEMENT.NEUTRAL,
     roll: CONTROL_CONSTANTS.MOVEMENT.NEUTRAL,
-    yaw: CONTROL_CONSTANTS.MOVEMENT.NEUTRAL
+    yaw: CONTROL_CONSTANTS.MOVEMENT.NEUTRAL,
   });
 
   const movementRef = useRef(movement);
@@ -76,14 +78,17 @@ export default function DroneController({ ws, isConnected }: Props) {
   }, []);
 
   // ===== FUNCIONES DE CONTROL DE MOTORES =====
-  
-  const sendMotorCommand = (motorId: keyof typeof MOTOR_CONFIG, speed: number) => {
+
+  const sendMotorCommand = (
+    motorId: keyof typeof MOTOR_CONFIG,
+    speed: number,
+  ) => {
     if (!ws || !isConnected) return;
 
     const motor = MOTOR_CONFIG[motorId];
     const direction = motor.direction;
     const adjustedSpeed = speed * direction;
-    
+
     // Enviar comando según dirección
     if (adjustedSpeed > 0) {
       ws.send(`${motor.in1}:${Math.abs(adjustedSpeed)}`);
@@ -105,30 +110,45 @@ export default function DroneController({ ws, isConnected }: Props) {
 
   // ===== CÁLCULO DE VELOCIDADES DE MOTORES =====
 
-  const calculateMotorSpeeds = (throttle: number, pitch: number, roll: number, yaw: number): MotorSpeeds => {
+  const calculateMotorSpeeds = (
+    throttle: number,
+    pitch: number,
+    roll: number,
+    yaw: number,
+  ): MotorSpeeds => {
     // Fórmula básica de mezcla para cuadricóptero X
     const base = throttle;
-    
-    return {
+
+    const rawSpeeds = {
       // Delantero izquierdo
       A1: base + pitch + roll + yaw,
-      // Delantero derecho  
+      // Delantero derecho
       A2: base + pitch - roll - yaw,
       // Trasero izquierdo
       B1: base - pitch + roll - yaw,
       // Trasero derecho
-      B2: base - pitch - roll + yaw
+      B2: base - pitch - roll + yaw,
     };
+
+    // Aplicar ajustes específicos a cada motor
+    const adjustedSpeeds: MotorSpeeds = {
+      A1: rawSpeeds.A1 - MOTOR_ADJUSTMENTS.A1,
+      A2: rawSpeeds.A2 - MOTOR_ADJUSTMENTS.A2,
+      B1: rawSpeeds.B1 - MOTOR_ADJUSTMENTS.B1,
+      B2: rawSpeeds.B2 - MOTOR_ADJUSTMENTS.B2,
+    };
+
+    return adjustedSpeeds;
   };
 
   const clampMotorSpeeds = (speeds: MotorSpeeds): MotorSpeeds => {
     const clamped: MotorSpeeds = { ...speeds };
-    
+
     Object.keys(speeds).forEach(motorId => {
       const key = motorId as keyof MotorSpeeds;
       clamped[key] = Math.max(0, Math.min(255, Math.round(speeds[key])));
     });
-    
+
     return clamped;
   };
 
@@ -138,22 +158,27 @@ export default function DroneController({ ws, isConnected }: Props) {
     if (!ws || !isConnected) return;
 
     const { throttle, pitch, roll, yaw } = movementRef.current;
-    
+
     // Calcular velocidades
     const rawSpeeds = calculateMotorSpeeds(throttle, pitch, roll, yaw);
     const clampedSpeeds = clampMotorSpeeds(rawSpeeds);
-    
+
     // Enviar comandos a cada motor
     Object.entries(clampedSpeeds).forEach(([motorId, speed]) => {
       sendMotorCommand(motorId as keyof typeof MOTOR_CONFIG, speed);
     });
 
-    console.log('Motors:', clampedSpeeds, 'Movement:', { throttle, pitch, roll, yaw });
+    console.log('Motors:', clampedSpeeds, 'Movement:', {
+      throttle,
+      pitch,
+      roll,
+      yaw,
+    });
   };
 
   const startSendingCommands = () => {
     if (sendIntervalRef.current) return;
-    
+
     sendIntervalRef.current = setInterval(() => {
       sendMovementCommands();
     }, 100);
@@ -168,120 +193,126 @@ export default function DroneController({ ws, isConnected }: Props) {
 
   // ===== HANDLERS DE CONTROLES =====
 
-const updateMovement = (updates: Partial<MovementState>) => {
-  setMovement(prev => ({ ...prev, ...updates }));
-};
+  const updateMovement = (updates: Partial<MovementState>) => {
+    setMovement(prev => ({ ...prev, ...updates }));
+  };
 
 const handleThrottleChange = (change: number) => {
   setMovement(prev => {
     const newThrottle = Math.max(
       CONTROL_CONSTANTS.THROTTLE.MIN,
-      Math.min(CONTROL_CONSTANTS.THROTTLE.MAX, prev.throttle + change)
+      Math.min(CONTROL_CONSTANTS.THROTTLE.MAX, prev.throttle + change),
     );
-    
     return { ...prev, throttle: newThrottle };
   });
-};
 
-const handleDirectionPress = (direction: 'forward' | 'backward' | 'left' | 'right') => {
-  const updates: Partial<MovementState> = {};
-  
-  switch (direction) {
-    case 'forward':
-      updates.pitch = CONTROL_CONSTANTS.MOVEMENT.PITCH_FORCE;
-      break;
-    case 'backward':
-      updates.pitch = -CONTROL_CONSTANTS.MOVEMENT.PITCH_FORCE;
-      break;
-    case 'left':
-      updates.roll = -CONTROL_CONSTANTS.MOVEMENT.ROLL_FORCE;
-      break;
-    case 'right':
-      updates.roll = CONTROL_CONSTANTS.MOVEMENT.ROLL_FORCE;
-      break;
-  }
-  
-  updateMovement(updates);
+  // Iniciar envío continuo si no está activo
   if (!sendIntervalRef.current) {
     startSendingCommands();
   }
 };
 
-const handleDirectionRelease = (axis: 'pitch' | 'roll') => {
-  updateMovement({ [axis]: CONTROL_CONSTANTS.MOVEMENT.NEUTRAL });
+const handleDirectionPress = (
+  direction: 'forward' | 'backward' | 'left' | 'right',
+) => {
+  setMovement(prev => {
+    const step = 20; // Incremento de 10
+    const updates = { ...prev };
+
+    switch (direction) {
+      case 'forward':
+        updates.pitch = prev.pitch + step; // ← SUMA 10 al valor actual
+        break;
+      case 'backward':
+        updates.pitch = prev.pitch - step; // ← RESTA 10 al valor actual
+        break;
+      case 'left':
+        updates.roll = prev.roll - step; // ← RESTA 10 al valor actual
+        break;
+      case 'right':
+        updates.roll = prev.roll + step; // ← SUMA 10 al valor actual
+        break;
+    }
+
+    return updates;
+  });
+
+  if (!sendIntervalRef.current) {
+    startSendingCommands();
+  }
 };
+
+  const handleDirectionRelease = (axis: 'pitch' | 'roll') => {
+    updateMovement({ [axis]: CONTROL_CONSTANTS.MOVEMENT.NEUTRAL });
+  };
 
 const handleYawPress = (direction: 'left' | 'right') => {
-  const yaw = direction === 'left' 
-    ? -CONTROL_CONSTANTS.MOVEMENT.YAW_FORCE 
-    : CONTROL_CONSTANTS.MOVEMENT.YAW_FORCE;
-  
-  updateMovement({ yaw });
+  setMovement(prev => {
+    const step = 10;
+    const yaw = direction === 'left' 
+      ? prev.yaw - step  // ← RESTA 10 al valor actual
+      : prev.yaw + step; // ← SUMA 10 al valor actual
+
+    return { ...prev, yaw };
+  });
+
   if (!sendIntervalRef.current) {
     startSendingCommands();
   }
 };
 
-const handleYawRelease = () => {
-  updateMovement({ yaw: CONTROL_CONSTANTS.MOVEMENT.NEUTRAL });
-};
+  const handleYawRelease = () => {
+    updateMovement({ yaw: CONTROL_CONSTANTS.MOVEMENT.NEUTRAL });
+  };
 
   const handleTakeOff = () => {
-    Alert.alert(
-      "Despegar",
-      "¿Iniciar secuencia de despegue?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { 
-          text: "Despegar", 
-          onPress: () => {
-            const takeoffThrottle = 120;
-            updateMovement({ 
-              throttle: takeoffThrottle,
-              pitch: 0,
-              roll: 0, 
-              yaw: 0
-            });
-            startSendingCommands();
-          }
-        }
-      ]
-    );
+    Alert.alert('Despegar', '¿Iniciar secuencia de despegue?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Despegar',
+        onPress: () => {
+          const takeoffThrottle = 120;
+          updateMovement({
+            throttle: takeoffThrottle,
+            pitch: 0,
+            roll: 0,
+            yaw: 0,
+          });
+          startSendingCommands();
+        },
+      },
+    ]);
   };
 
   const handleLand = () => {
-    updateMovement({ 
+    updateMovement({
       throttle: 0,
       pitch: 0,
       roll: 0,
-      yaw: 0
+      yaw: 0,
     });
     stopSendingCommands();
     sendAllMotorsStop();
   };
 
   const handleEmergencyStop = () => {
-    Alert.alert(
-      "PARADA DE EMERGENCIA",
-      "¿Detener motores inmediatamente?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { 
-          text: "DETENER", 
-          style: "destructive",
-          onPress: () => {
-            updateMovement({ 
-              throttle: 0,
-              pitch: 0,
-              roll: 0,
-              yaw: 0
-            });
-            stopSendingCommands();
-            sendAllMotorsStop();
-          }
-        }
-      ]
-    );
+    Alert.alert('PARADA DE EMERGENCIA', '¿Detener motores inmediatamente?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'DETENER',
+        style: 'destructive',
+        onPress: () => {
+          updateMovement({
+            throttle: 0,
+            pitch: 0,
+            roll: 0,
+            yaw: 0,
+          });
+          stopSendingCommands();
+          sendAllMotorsStop();
+        },
+      },
+    ]);
   };
 
   const handleResetThrottle = () => {
@@ -290,11 +321,71 @@ const handleYawRelease = () => {
 
   // ===== RENDER =====
 
-return (
-  <View style={styles.container}>
-    {/* ... resto del código igual ... */}
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Control de Dron</Text>
 
-    {/* DIRECTION CONTROL */}
+      <View style={styles.connectionStatus}>
+        <View
+          style={[
+            styles.statusIndicator,
+            { backgroundColor: isConnected ? '#22c55e' : '#ef4444' },
+          ]}
+        />
+        <Text style={styles.statusText}>
+          {isConnected ? 'CONECTADO' : 'DESCONECTADO'}
+        </Text>
+      </View>
+
+      {/* THROTTLE CONTROL */}
+      <View style={styles.throttleSection}>
+        <View style={styles.throttleHeader}>
+          <Text style={styles.sectionTitle}>ALTITUD: {movement.throttle}</Text>
+          <TouchableOpacity
+            style={styles.resetThrottleBtn}
+            onPress={handleResetThrottle}
+            disabled={!isConnected}
+          >
+            <Text style={styles.resetThrottleText}>RESET</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.throttleDisplay}>
+          <Text style={styles.throttleValue}>{movement.throttle}</Text>
+          <View style={styles.throttleBar}>
+            <View
+              style={[
+                styles.throttleFill,
+                { height: `${(movement.throttle / 255) * 100}%` },
+              ]}
+            />
+          </View>
+        </View>
+
+        <View style={styles.altitudeButtons}>
+          <TouchableOpacity
+            style={[styles.altitudeBtn, styles.upBtn]}
+            onPressIn={() =>
+              handleThrottleChange(CONTROL_CONSTANTS.THROTTLE.STEP)
+            }
+            disabled={!isConnected}
+          >
+            <Text style={styles.altitudeText}>▲ SUBIR</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.altitudeBtn, styles.downBtn]}
+            onPressIn={() =>
+              handleThrottleChange(-CONTROL_CONSTANTS.THROTTLE.STEP)
+            }
+            disabled={!isConnected}
+          >
+            <Text style={styles.altitudeText}>▼ BAJAR</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* DIRECTION CONTROL */}
     <View style={styles.directionSection}>
       <Text style={styles.sectionTitle}>DIRECCIÓN</Text>
       
@@ -377,7 +468,7 @@ return (
         >
           <Text style={styles.commandText}>DESPEGAR</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[styles.commandBtn, styles.landBtn]}
           onPress={handleLand}
@@ -385,7 +476,7 @@ return (
         >
           <Text style={styles.commandText}>ATERRIZAR</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[styles.commandBtn, styles.emergencyBtn]}
           onPress={handleEmergencyStop}
@@ -396,7 +487,8 @@ return (
 
       <View style={styles.infoPanel}>
         <Text style={styles.infoText}>
-          Throttle: {movement.throttle} | Pitch: {movement.pitch} | Roll: {movement.roll} | Yaw: {movement.yaw}
+          Throttle: {movement.throttle} | Pitch: {movement.pitch} | Roll:{' '}
+          {movement.roll} | Yaw: {movement.yaw}
         </Text>
         <Text style={styles.infoHint}>
           Mantén presionados los botones para mover el dron
